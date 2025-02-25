@@ -35,3 +35,27 @@
 (define-constant ERR_INVALID_RECIPIENT (err u5))
 ;; Add new error constant for invalid user
 (define-constant ERR_INVALID_USER (err u12))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;; Maps ;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-map user-tip-stats principal 
+  { 
+    total-tips-sent: uint, 
+    total-tips-received: uint, 
+    reward-points: uint 
+  }
+)
+
+(define-map tip-history 
+  { sender: principal, recipient: principal, timestamp: uint } 
+  { amount: uint, fee: uint, token-type: (string-ascii 32) }
+)
+
+(define-map user-identity principal {
+    username: (string-ascii 50),
+    verified: bool
+})
+
+(define-map username-registry (string-ascii 50) bool)
