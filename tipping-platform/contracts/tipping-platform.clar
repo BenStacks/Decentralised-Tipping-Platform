@@ -85,3 +85,159 @@
         reward-points: u0
     }
 )
+
+
+
+;; Process tip transfer
+(define-private (process-tip-transfer (recipient principal) (tip-amount uint) (platform-fee uint))
+    (begin
+        ;; Transfer tip amount to recipient
+        (match (stx-transfer? tip-amount tx-sender recipient)
+            success (match (stx-transfer? platform-fee tx-sender CONTRACT_OWNER)
+                fee-success (ok true)
+                fee-error (err ERR_TRANSFER_FAILED)
+            )
+            error (err ERR_TRANSFER_FAILED)
+        )
+    )
+)
+
+
+(define-private (check-tip-amount (amount uint))
+    (and 
+      (>= (stx-get-balance tx-sender) amount)
+      (< amount MAX_TIP_AMOUNT)
+    )
+)
+
+(define-private (transfer-tip (recipient principal) (amount uint))
+  (match (stx-transfer? amount tx-sender recipient)
+    success (ok true)
+    error (err ERR_TRANSFER_FAILED)
+  )
+)
+
+(define-private (transfer-platform-fee (fee uint))
+  (match (stx-transfer? fee tx-sender CONTRACT_OWNER)
+    success (ok true)
+    error (err ERR_TRANSFER_FAILED)
+  )
+)
+
+
+
+
+(define-private (update-sender-stats (sender principal) (amount uint))
+  (map-set user-tip-stats sender 
+    (merge 
+      (default-to 
+        { total-tips-sent: u0, total-tips-received: u0, reward-points: u0 }
+        (map-get? user-tip-stats sender)
+      )
+      { 
+        total-tips-sent: (+ 
+          (get total-tips-sent 
+            (default-to 
+              { total-tips-sent: u0, total-tips-received: u0, reward-points: u0 }
+              (map-get? user-tip-stats sender)
+            )
+          ) 
+          amount
+        ) 
+      }
+    )
+  )
+)
+
+
+
+(define-private (update-recipient-stats (recipient principal) (amount uint))
+  (let (
+    (platform-fee (calculate-platform-fee amount))
+    (actual-tip-amount (- amount platform-fee))
+  )
+    (map-set user-tip-stats recipient 
+      (merge 
+        (default-to 
+          { total-tips-sent: u0, total-tips-received: u0, reward-points: u0 }
+          (map-get? user-tip-stats recipient)
+        )
+        { 
+          total-tips-received: (+ 
+            (get total-tips-received 
+              (default-to 
+                { total-tips-sent: u0, total-tips-received: u0, reward-points: u0 }
+                (map-get? user-tip-stats recipient)
+              )
+            ) 
+            actual-tip-amount 
+          ) 
+        }
+      )
+    )
+  )
+)
+
+
+
+(define-private (log-transaction (sender principal) (recipient principal) (amount uint) (fee uint) (token-type (string-ascii 32)))
+  (map-set tip-history 
+    { 
+      sender: sender, 
+      recipient: recipient, 
+      timestamp: stacks-block-height 
+    }
+    { 
+      amount: amount, 
+      fee: fee,
+      token-type: token-type
+    }
+  )
+)
+
+(define-private (update-reward-points (sender principal) (amount uint))
+  (if (>= amount REWARD_THRESHOLD)
+    (map-set user-tip-stats sender 
+      (merge 
+        (unwrap-panic (map-get? user-tip-stats sender))
+        { reward-points: (+ (get reward-points (unwrap-panic (map-get? user-tip-stats sender))) REWARD_RATE) }
+      )
+    )
+    true
+  )
+)
+
+
+;; Validate tip amount
+(define-private (validate-tip-amount (amount uint))
+    (and 
+        (>= (stx-get-balance tx-sender) amount)
+        (< amount MAX_TIP_AMOUNT)
+    )
+)
+
+
+
+
+(define-private (is-valid-recipient (recipient principal))
+    (and 
+        (not (is-eq recipient CONTRACT_OWNER)) 
+        (not (is-eq recipient tx-sender))
+    )
+)
+
+
+(define-private (is-valid-token-type (token-type (string-ascii 3)))
+    (is-some (index-of ALLOWED_TOKENS token-type))
+)
+
+;; Add a helper function to validate user
+(define-private (is-valid-user (user principal))
+    (and 
+        ;; Prevent zero or contract owner address
+        (not (is-eq user CONTRACT_OWNER))
+        ;; (not (is-eq user tx-sender))
+    )
+)
+
+
