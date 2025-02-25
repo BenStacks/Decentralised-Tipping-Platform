@@ -59,3 +59,29 @@
 })
 
 (define-map username-registry (string-ascii 50) bool)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;; Helper Functions ;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-private (calculate-platform-fee (amount uint))
+  (/ (* amount PLATFORM_FEE_PERCENTAGE) u100)
+)
+
+(define-private (calculate-tip-amount (amount uint) (platform-fee uint))
+  (- amount platform-fee)
+)
+
+(define-private (get-current-block-height)
+  (get-stacks-block-info? time (- stacks-block-height u1))
+)
+
+;; ;; Get default stats for new users
+(define-private (get-default-stats)
+    {
+        total-tips-sent: u0,
+        total-tips-received: u0,
+        reward-points: u0
+    }
+)
